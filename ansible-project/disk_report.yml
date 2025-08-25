@@ -1,0 +1,142 @@
+# disk_report.yml
+---
+- hosts: all
+  gather_facts: false
+  connection: local
+
+  vars:
+    # Directory for storing individual instance metrics
+    metrics_dir: "./metrics"
+    # Report file path
+    report_path: "./disk_usage_report.html"
+    # Default values for failed checks
+    default_disk_info: ['N/A', 'N/A', 'N/A', 'N/A', '0%']
+    # Current timestamp
+    timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+
+  tasks:
+    # Initialize metrics directory
+    - name: Ensure metrics directory exists
+      file:
+        path: "{{ metrics_dir }}"
+        state: directory
+        mode: '0755'
+      run_once: true
+      delegate_to: localhost
+
+    # Extract account ID from SSM role ARN
+    - name: Set AWS account ID
+      set_fact:
+        account_id: "{{ ansible_aws_ssm_role_arn.split(':')[4] }}"
+
+    # Assume cross-account role for SSM access
+    - name: Assume target account role
+      shell: |
+        aws sts assume-role \
+          --role-arn "arn:aws:iam::{{ account_id }}:role/ManagedNodeRole" \
+          --role-session-name "SSMDiskCheck-{{ timestamp }}" \
+          --output json
+      register: assumed_role
+      changed_when: false
+
+    # Execute disk usage check via SSM
+    - name: Execute disk usage check
+      shell: |
+        AWS_ACCESS_KEY_ID={{ (assumed_role.stdout | from_json).Credentials.AccessKeyId }} \
+        AWS_SECRET_ACCESS_KEY={{ (assumed_role.stdout | from_json).Credentials.SecretAccessKey }} \
+        AWS_SESSION_TOKEN={{ (assumed_role.stdout | from_json).Credentials.SessionToken }} \
+        aws ssm send-command \
+          --region {{ ansible_aws_ssm_region }} \
+          --instance-ids "{{ ansible_aws_ssm_instance_id }}" \
+          --document-name "AWS-RunShellScript" \
+          --parameters '{"commands":["df -h /"]}'
+      register: ssm_command
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: ssm_command is success
+
+    # Get command output from SSM
+    - name: Retrieve command output
+      shell: |
+        AWS_ACCESS_KEY_ID={{ (assumed_role.stdout | from_json).Credentials.AccessKeyId }} \
+        AWS_SECRET_ACCESS_KEY={{ (assumed_role.stdout | from_json).Credentials.SecretAccessKey }} \
+        AWS_SESSION_TOKEN={{ (assumed_role.stdout | from_json).Credentials.SessionToken }} \
+        aws ssm get-command-invocation \
+          --region {{ ansible_aws_ssm_region }} \
+          --command-id {{ (ssm_command.stdout | from_json).Command.CommandId }} \
+          --instance-id {{ ansible_aws_ssm_instance_id }}
+      register: command_output
+      until: (command_output.stdout | from_json).Status not in ['Pending', 'InProgress']
+      retries: 10
+      delay: 3
+      changed_when: false
+
+    # Initialize with default values
+    - name: Set default disk metrics
+      set_fact:
+        disk_info: "{{ default_disk_info }}"
+
+    # Try to parse actual disk usage
+    - name: Parse disk usage data
+      set_fact:
+        disk_info: "{{ (command_output.stdout | from_json).StandardOutputContent.split('\n')[1].split() }}"
+      when: 
+        - command_output is success
+        - command_output.stdout is defined
+        - (command_output.stdout | from_json).StandardOutputContent is defined
+        - (command_output.stdout | from_json).StandardOutputContent.split('\n') | length > 1
+      ignore_errors: yes
+
+    # Save metrics for each instance
+    - name: Save instance metrics
+      copy:
+        content: "{{ {
+          'account_id': account_id,
+          'instance_id': ansible_aws_ssm_instance_id,
+          'disk_usage': disk_info[4] | replace('%',''),
+          'timestamp': timestamp
+        } | to_json }}"
+        dest: "{{ metrics_dir }}/{{ ansible_aws_ssm_instance_id }}.json"
+        mode: '0644'
+      delegate_to: localhost
+
+    # Combine all instance metrics
+    - name: Aggregate all metrics
+      shell: "cat {{ metrics_dir }}/*.json | jq -s '.'"
+      register: combined_metrics
+      run_once: true
+      delegate_to: localhost
+      changed_when: false
+
+    # Generate HTML report
+    - name: Generate HTML report
+      template:
+        src: templates/disk_report.html.j2
+        dest: "{{ report_path }}"
+        mode: '0644'
+      vars:
+        metrics_list: "{{ combined_metrics.stdout | from_json }}"
+        report_generation_time: "{{ timestamp }}"
+      run_once: true
+      delegate_to: localhost
+
+    # Clean up old metrics files
+    - name: Cleanup old metrics
+      file:
+        path: "{{ metrics_dir }}"
+        state: absent
+      run_once: true
+      delegate_to: localhost
+
+    # Output summary for logging
+    - name: Display execution summary
+      debug:
+        msg: |
+          Disk Usage Check Summary:
+          - Account: {{ account_id }}
+          - Instance: {{ ansible_aws_ssm_instance_id }}
+          - Status: {{ 'Success' if command_output is success else 'Failed' }}
+          - Usage: {{ disk_info[4] if disk_info[4] != '0%' else 'Check Failed' }}
+
+
