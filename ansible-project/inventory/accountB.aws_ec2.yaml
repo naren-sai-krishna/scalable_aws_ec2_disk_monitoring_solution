@@ -1,7 +1,7 @@
 plugin: amazon.aws.aws_ec2
 regions:
   - us-east-1
-assume_role_arn: arn:aws:iam::<Account-B>:role/ManagedNodeRole
+assume_role_arn: arn:aws:iam::<Account-B>:role/MemberAccountRole
 filters:
   instance-state-name: running
   tag: Environment: Dev
@@ -11,5 +11,5 @@ keyed_groups:
 compose:
   ansible_aws_ssm_instance_id: instance_id
   account_id: owner_id
-  ansible_aws_ssm_role_arn: "'arn:aws:iam::<Account-B>:role/ManagedNodeRole'"
+  ansible_aws_ssm_role_arn: "'arn:aws:iam::<Account-B>:role/MemberAccountRole'"
   ansible_aws_ssm_region: placement.region
