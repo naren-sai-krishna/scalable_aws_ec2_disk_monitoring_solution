@@ -33,7 +33,7 @@
     - name: Assume target account role
       shell: |
         aws sts assume-role \
-          --role-arn "arn:aws:iam::{{ account_id }}:role/ManagedNodeRole" \
+          --role-arn "arn:aws:iam::{{ account_id }}:role/MemberAccountRole" \
           --role-session-name "SSMDiskCheck-{{ timestamp }}" \
           --output json
       register: assumed_role
