@@ -163,31 +163,6 @@ After evaluating the three approaches, I recommend to adopt the Ansible + SSM-ba
    * Install Ansible, boto3 and other required packages.
    * Clone the Ansible repository that contains the **inventory and playbook files**. Create or update the inventory files with your account information.
 
-5. **Configure Inventory**
-
-   * After cloning the repo, **create or update the Ansible inventory configuration** with your account details.
-   * Example `aws_ec2.yml`:
-
-     ```yaml
-     plugin: aws_ec2
-     regions:
-       - ap-south-1
-       - us-east-1
-     keyed_groups:
-       - key: tags.Name
-         prefix: tag_Name_
-     hostnames:
-       - private-ip-address
-     filters:
-       instance-state-name: running
-       Environment: Dev
-     strict: False
-     boto_profile: default
-     ```
-   * Add your **account IDs and role ARNs** under `[inventory]` if using group\_vars/host\_vars.
-   * Make sure `ansible_aws_ssm_profile` (for cross-account role assumption) points to the **ManagedNodeRole** in each account.
----
-
 ### 2. Member Accounts (Managed Nodes & Inventory Discovery)
 
 Each member account requires **two roles**:
