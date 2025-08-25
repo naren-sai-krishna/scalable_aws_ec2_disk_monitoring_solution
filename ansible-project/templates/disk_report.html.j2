@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AWS Disk Usage Report</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px;
+        }
+        th, td { 
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th { 
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .high { 
+            background-color: #fff3cd;
+        }
+        .critical {
+            background-color: #f8d7da;
+        }
+        .error {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
+        .header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AWS Disk Usage Report</h1>
+            <p class="timestamp">Generated: {{ report_generation_time }}</p>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Account ID</th>
+                    <th>Instance ID</th>
+                    <th>Disk Usage</th>
+                    <th>Last Check</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in metrics_list | sort(attribute='disk_usage') %}
+                <tr class="
+                    {%- if item.disk_usage == '0' or item.disk_usage == 'N/A' %}error
+                    {%- elif item.disk_usage | float >= 90 %}critical
+                    {%- elif item.disk_usage | float >= 80 %}high
+                    {%- endif %}">
+                    <td>{{ item.account_id }}</td>
+                    <td>{{ item.instance_id }}</td>
+                    <td>
+                        {% if item.disk_usage == '0' or item.disk_usage == 'N/A' %}
+                            Check Failed
+                        {% else %}
+                            {{ item.disk_usage }}%
+                        {% endif %}
+                    </td>
+                    <td>{{ item.timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
