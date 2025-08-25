@@ -147,7 +147,7 @@ After evaluating the three approaches, I recommend to adopt the Ansible + SSM-ba
            "Sid": "AllowAssumeMemberRoles",
            "Effect": "Allow",
            "Action": "sts:AssumeRole",
-           "Resource": "arn:aws:iam::*:role/ManagedNodeRole"
+           "Resource": "arn:aws:iam::*:role/MemberAccountRole"
          }
        ]
      }
@@ -200,7 +200,7 @@ Each member account requires **two roles**:
 
 #### b. Discovery & Remote Execution Role (for Control Node Access)
 
-1. Create IAM role `ManagedNodeRole`.
+1. Create IAM role `MemberAccountRole`.
 
    * **Trust Policy** (allow the control node in Management Account to assume this role):
 
@@ -264,7 +264,7 @@ For each member account, create a dedicated inventory file under the `/inventory
 plugin: amazon.aws.aws_ec2
 regions:
   - us-east-1
-assume_role_arn: arn:aws:iam::<Account-B>:role/ManagedNodeRole
+assume_role_arn: arn:aws:iam::<Account-B>:role/MemberAccountRole
 filters:
   instance-state-name: running
   tag: Environment: Dev
@@ -274,7 +274,7 @@ keyed_groups:
 compose:
   ansible_aws_ssm_instance_id: instance_id
   account_id: owner_id
-  ansible_aws_ssm_role_arn: "'arn:aws:iam::<Account-B>:role/ManagedNodeRole'"
+  ansible_aws_ssm_role_arn: "'arn:aws:iam::<Account-B>:role/MemberAccountRole'"
   ansible_aws_ssm_region: placement.region
 ```
 
@@ -336,7 +336,7 @@ This ensures the **operations team receives the disk usage report in their inbox
 
 ## End-to-End Flow
 
-1. Control Node (Management Account EC2 with `ControlNodeRole`) uses **STS AssumeRole** into `ManagedNodeRole` in each member account.
+1. Control Node (Management Account EC2 with `ControlNodeRole`) uses **STS AssumeRole** into `MemberAccountRole` in each member account.
 2. Control Node fetches **EC2 inventory dynamically** (via `aws_ec2` plugin in Ansible).
 3. Control Node sends **SSM SendCommand** (e.g., `df -h`) to all targeted EC2s.
 4. EC2 instances (with `RoleForSSM` attached) execute the command via SSM Agent and return the output.
@@ -351,7 +351,7 @@ This solution ensures **secure, scalable and automated disk usage monitoring** a
 
 * **Scalability**: Dynamic inventory discovery using the Ansible `aws_ec2` plugin ensures that instances are automatically included or excluded based on tags and filters. This eliminates manual host file management and scales seamlessly across hundreds of instances, multiple accounts and regions.
 
-* **Automation of AWS Setup**: While the IAM roles and trust relationships can be configured manually, they can also be fully **automated using AWS CloudFormation StackSets**. With StackSets, the required IAM roles (`RoleForSSM` on EC2 instances and `ManagedNodeRole` for cross-account execution) can be rolled out to all member accounts consistently, reducing manual overhead and configuration drift.
+* **Automation of AWS Setup**: While the IAM roles and trust relationships can be configured manually, they can also be fully **automated using AWS CloudFormation StackSets**. With StackSets, the required IAM roles (`RoleForSSM` on EC2 instances and `MemberAccountRole` for cross-account execution) can be rolled out to all member accounts consistently, reducing manual overhead and configuration drift.
 
 * **Extensibility**: Beyond generating `disk_usage_report.html`, the workflow can be extended to send automated emails, feed into dashboards or trigger alerts when thresholds are breached — ensuring proactive monitoring and faster response.
 
