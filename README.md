@@ -25,7 +25,7 @@ This document proposes a **secure scalable disk usage monitoring solution** for 
 
   * Private Instances:
     * **Not directly reachable** without additional networking.
-    * Requires **VPC peering, Transit Gateway, or VPN** connectivity to establish SSH sessions → **adds cost and operational overhead**.
+    * Requires **VPC peering, Transit Gateway or VPN** connectivity to establish SSH sessions → **adds cost and operational overhead**.
     * Scaling this across accounts and VPCs is complex.
  
 * **Advantages**:
@@ -48,7 +48,7 @@ This document proposes a **secure scalable disk usage monitoring solution** for 
 
   * Private Instances:
     * Communicate with SSM through **VPC Interface Endpoints** (`ssm`, `ssmmessages`, `ec2messages`).
-    * Secure, does not require public IPs, NAT, peering, or TGW.
+    * Secure, does not require public IPs, NAT, peering or TGW.
 
 * **Advantages**:
   * Secure (no inbound SSH).
@@ -67,7 +67,7 @@ This document proposes a **secure scalable disk usage monitoring solution** for 
 * **Connectivity**:
   * Fully managed and push-based — no inbound access, agents push metrics securely to CloudWatch.
   * Works seamlessly across AWS accounts and regions once the monitoring account is designated.
-  * No need for bastions, VPC endpoints, or open ports.
+  * No need for bastions, VPC endpoints or open ports.
 
 * **Advantages**:
   * **Entirely managed** on the cloud side → minimal operational overhead.
@@ -84,7 +84,7 @@ This document proposes a **secure scalable disk usage monitoring solution** for 
 ## Chosen Design:
 After evaluating the three approaches, I recommend to adopt the Ansible + SSM-based monitoring design. Below are the reasons:
 
-1. **Security**: Unlike SSH, SSM does not require inbound ports or key distribution. Private instances communicate with SSM through secure VPC Interface Endpoints, eliminating the need for NAT, VPC peering, or Transit Gateway.
+1. **Security**: Unlike SSH, SSM does not require inbound ports or key distribution. Private instances communicate with SSM through secure VPC Interface Endpoints, eliminating the need for NAT, VPC peering or Transit Gateway.
 2. **Scalability**: SSM scales seamlessly across hundreds of instances, multiple accounts and regions, while SSH requires complex networking and is difficult to scale.
 3. **Operational Simplicity**: SSM allows Ansible playbooks to execute disk usage commands (`df -h`) directly without installing CloudWatch Agent or managing cross-account CloudWatch dashboards. This keeps the workflow aligned with the enterprise’s existing **Ansible-driven strategy**.
 4. **Compatibility**: Most modern AMIs already include the SSM Agent, minimizing additional setup effort. IAM-based access control provides a more secure and manageable alternative to SSH keys.
@@ -353,7 +353,7 @@ This solution ensures **secure, scalable and automated disk usage monitoring** a
 
 * **Automation of AWS Setup**: While the IAM roles and trust relationships can be configured manually, they can also be fully **automated using AWS CloudFormation StackSets**. With StackSets, the required IAM roles (`RoleForSSM` on EC2 instances and `ManagedNodeRole` for cross-account execution) can be rolled out to all member accounts consistently, reducing manual overhead and configuration drift.
 
-* **Extensibility**: Beyond generating `disk_usage_report.html`, the workflow can be extended to send automated emails, feed into dashboards, or trigger alerts when thresholds are breached — ensuring proactive monitoring and faster response.
+* **Extensibility**: Beyond generating `disk_usage_report.html`, the workflow can be extended to send automated emails, feed into dashboards or trigger alerts when thresholds are breached — ensuring proactive monitoring and faster response.
 
 In summary, this design balances **security (IAM + SSM)**, **scalability (dynamic inventory discovery)** and **operational efficiency (CloudFormation StackSets for automation)**, making it a future-proof solution for enterprise-scale disk monitoring on AWS.
 
